@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abdukhalilov Cloud Drive</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background: #0f172a; color: #f8fafc; min-height: 100vh; }
+        
+        /* Login oynasi */
+        #loginScreen { display: flex; align-items: center; justify-content: center; height: 100vh; padding: 20px; }
+        .login-box { background: #1e293b; padding: 35px; border-radius: 16px; width: 100%; max-width: 380px; border: 1px solid #334155; text-align: center; display: flex; flex-direction: column; gap: 16px; }
+        .login-box input { padding: 12px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 15px; text-align: center; }
+
+        /* Asosiy ilova */
+        #appScreen { display: none; min-height: 100vh; }
+        .sidebar { width: 250px; background: #1e293b; padding: 24px; border-right: 1px solid #334155; display: flex; flex-direction: column; gap: 12px; }
+        .logo { font-size: 20px; font-weight: bold; color: #38bdf8; margin-bottom: 10px; }
+        .menu-btn { background: transparent; border: none; color: #cbd5e1; text-align: left; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: 0.2s; }
+        .menu-btn:hover, .menu-btn.active { background: #334155; color: #fff; }
+        
+        .main { flex: 1; padding: 30px; max-width: 1200px; margin: 0 auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 240px; padding: 12px 16px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #fff; font-size: 15px; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn { padding: 12px 18px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; font-size: 14px; transition: 0.2s; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #0284c7; color: #fff; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-secondary { background: #334155; color: #fff; }
+        .btn-secondary:hover { background: #475569; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; transition: 0.2s; }
+        .card:hover { border-color: #38bdf8; transform: translateY(-2px); }
+        .card-clickable { cursor: pointer; }
+        .file-icon { font-size: 30px; }
+        .file-name { font-weight: 600; word-break: break-all; font-size: 15px; margin-top: 6px; }
+        .file-meta { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .card-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #334155; padding-top: 10px; font-size: 13px; }
+        .link-btn { background: none; border: none; color: #38bdf8; cursor: pointer; text-decoration: none; font-weight: 500; }
+        .del-btn { background: none; border: none; color: #f87171; cursor: pointer; }
+
+        /* Modallar */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.82); align-items: center; justify-content: center; padding: 20px; z-index: 100; }
+        .modal.open { display: flex; }
+        .modal-box { background: #1e293b; padding: 25px; border-radius: 14px; width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 15px; border: 1px solid #334155; max-height: 90vh; }
+        .modal-box input, .modal-box textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 14px; }
+        .modal-box textarea { height: 220px; resize: vertical; font-family: monospace; }
+        
+        /* Preview konteyner */
+        #previewBody { overflow: auto; display: flex; justify-content: center; align-items: center; max-height: 70vh; width: 100%; }
+        #previewBody video, #previewBody img { max-width: 100%; max-height: 68vh; border-radius: 8px; outline: none; }
+        #previewBody iframe { width: 100%; height: 68vh; border: none; border-radius: 8px; background: #fff; }
+        #previewBody pre { width: 100%; background: #0f172a; padding: 15px; border-radius: 8px; overflow-x: auto; max-height: 65vh; white-space: pre-wrap; font-size: 14px; border: 1px solid #334155; text-align: left; }
+
+        @media (max-width: 768px) {
+            #appScreen { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid #334155; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Kirish oynasi -->
+    <div id="loginScreen">
+        <div class="login-box">
+            <div style="font-size: 36px;">🔐</div>
+            <h2>Abdukhalilov Drive</h2>
+            <p style="color: #94a3b8; font-size: 14px;">Shaxsiy omborga kirish uchun parolni kiriting</p>
+            <input type="password" id="passwordInput" placeholder="Parol..." onkeydown="if(event.key==='Enter') login()">
+            <button class="btn btn-primary" onclick="login()">Kirish</button>
+        </div>
+    </div>
+
+    <!-- Asosiy Drive oynasi -->
+    <div id="appScreen">
+        <div class="sidebar">
+            <div class="logo">⚡ Abdukhalilov Drive</div>
+            <button class="menu-btn active" onclick="filterFiles('all', this)">📁 Barcha fayllar</button>
+            <button class="menu-btn" onclick="filterFiles('video', this)">🎬 Videolar</button>
+            <button class="menu-btn" onclick="filterFiles('image', this)">🖼️ Rasmlar</button>
+            <button class="menu-btn" onclick="filterFiles('text', this)">📝 Qaydlar va Kodlar</button>
+            <button class="menu-btn" onclick="filterFiles('doc', this)">📄 Hujjatlar</button>
+            <button class="menu-btn" style="margin-top: auto; color: #f87171;" onclick="logout()">🚪 Chiqish</button>
+        </div>
+
+        <div class="main">
+            <div class="topbar">
+                <input type="text" id="searchInput" class="search-box" placeholder="Qidirish..." oninput="renderFiles()">
+                <div class="actions">
+                    <button class="btn btn-secondary" onclick="openModal('noteModal')">+ Yangi qayd / kod</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">⬆️ Fayl yuklash</button>
+                    <input type="file" id="fileInput" hidden onchange="uploadFile(event)">
+                </div>
+            </div>
+            <div id="filesGrid" class="grid"></div>
+        </div>
+    </div>
+
+    <!-- Yangi qayd oynasi -->
+    <div id="noteModal" class="modal">
+        <div class="modal-box" style="max-width: 550px;">
+            <h3>Yangi qayd yoki kod saqlash</h3>
+            <input type="text" id="noteTitle" placeholder="Sarlavha (masalan: Python skript yoki IELTS so'zlar)">
+            <textarea id="noteContent" placeholder="Matn yoki kodni shu yerga yozing..."></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-secondary" onclick="closeModal('noteModal')">Bekor qilish</button>
+                <button class="btn btn-primary" onclick="saveNote()">Saqlash</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Universal Ko'rish (Preview) oynasi -->
+    <div id="previewModal" class="modal" onclick="if(event.target===this) closePreview()">
+        <div class="modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="previewTitle" style="word-break: break-all;">Fayl nomi</h3>
+                <button class="btn btn-secondary" style="padding: 6px 12px;" onclick="closePreview()">✖</button>
+            </div>
+            <div id="previewBody"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="copyTextBtn" class="btn btn-secondary" style="display:none;" onclick="copyContent()">📋 Nusxa olish</button>
+                <a id="modalDownloadBtn" href="#" class="btn btn-secondary">⬇️ Yuklab olish</a>
+                <button class="btn btn-primary" onclick="closePreview()">Yopish</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('drive_token') || '';
+        let allFiles = [];
+        let currentCategory = 'all';
+
+        const videoExts = ['.mp4', '.webm', '.mov', '.mkv', '.avi'];
+        const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+        const audioExts = ['.mp3', '.wav', '.ogg', '.m4a'];
+        const textExts = ['.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.cpp'];
+        const docExts = ['.pdf', '.doc', '.docx', '.xlsx', '.pptx'];
+
+        if (token) checkAuth();
+
+        async function login() {
+            const password = document.getElementById('passwordInput').value;
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                token = data.token;
+                localStorage.setItem('drive_token', token);
+                showApp();
+            } else {
+                alert("Parol noto'g'ri!");
+            }
+        }
+
+        async function checkAuth() {
+            const res = await fetch('/api/files', { headers: { 'X-Token': token } });
+            if (res.ok) {
+                allFiles = await res.json();
+                showApp(false);
+                renderFiles();
+            } else {
+                logout();
+            }
+        }
+
+        function showApp(shouldFetch = true) {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appScreen').style.display = 'flex';
+            if (shouldFetch) fetchFiles();
+        }
+
+        function logout() {
+            localStorage.removeItem('drive_token');
+            token = '';
+            document.getElementById('appScreen').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'flex';
+        }
+
+        async function fetchFiles() {
+            const res = await fetch('/api/files', { headers: { 'X-Token': token } });
+            if (res.ok) {
+                allFiles = await res.json();
+                renderFiles();
+            }
+        }
+
+        function getIcon(ext) {
+            if (videoExts.includes(ext)) return '🎬';
+            if (imageExts.includes(ext)) return '🖼️';
+            if (audioExts.includes(ext)) return '🎵';
+            if (textExts.includes(ext)) return '📝';
+            if (docExts.includes(ext)) return '📄';
+            return '📁';
+        }
+
+        function filterFiles(category, btn) {
+            currentCategory = category;
+            document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderFiles();
+        }
+
+        function renderFiles() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const grid = document.getElementById('filesGrid');
+            grid.innerHTML = '';
+
+            const filtered = allFiles.filter(f => {
+                if (!f.name.toLowerCase().includes(query)) return false;
+                if (currentCategory === 'video') return videoExts.includes(f.ext);
+                if (currentCategory === 'image') return imageExts.includes(f.ext);
+                if (currentCategory === 'text') return textExts.includes(f.ext);
+                if (currentCategory === 'doc') return docExts.includes(f.ext);
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="color:#94a3b8;">Fayllar topilmadi.</p>';
+                return;
+            }
+
+            filtered.forEach(file => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-clickable" onclick="previewFile('${file.name}', '${file.ext}')">
+                        <div class="file-icon">${getIcon(file.ext)}</div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-meta">${file.size} KB • ${file.date}</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="link-btn" onclick="previewFile('${file.name}', '${file.ext}')">👁️ Ko'rish</button>
+                        <a href="/api/download/${encodeURIComponent(file.name)}?token=${encodeURIComponent(token)}" class="link-btn">⬇️ Yuklash</a>
+                        <button class="del-btn" onclick="deleteFile('${file.name}')">🗑️</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Yuklab olmasdan sayt ichida ochish funksiyasi
+        async function previewFile(filename, ext) {
+            const body = document.getElementById('previewBody');
+            const copyBtn = document.getElementById('copyTextBtn');
+            const dlBtn = document.getElementById('modalDownloadBtn');
+            
+            document.getElementById('previewTitle').innerText = filename;
+            dlBtn.href = `/api/download/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
+            copyBtn.style.display = 'none';
+            body.innerHTML = '<p style="color:#94a3b8;">Yuklanmoqda...</p>';
+            openModal('previewModal');
+
+            const viewUrl = `/api/view/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
+
+            if (videoExts.includes(ext)) {
+                body.innerHTML = `<video src="${viewUrl}" controls autoplay></video>`;
+            } else if (imageExts.includes(ext)) {
+                body.innerHTML = `<img src="${viewUrl}" alt="${filename}">`;
+            } else if (audioExts.includes(ext)) {
+                body.innerHTML = `<audio src="${viewUrl}" controls autoplay style="width:100%;"></audio>`;
+            } else if (ext === '.pdf') {
+                body.innerHTML = `<iframe src="${viewUrl}"></iframe>`;
+            } else if (textExts.includes(ext)) {
+                const res = await fetch('/api/read/' + encodeURIComponent(filename), { headers: { 'X-Token': token } });
+                const data = await res.json();
+                body.innerHTML = `<pre id="textPreviewContent"></pre>`;
+                document.getElementById('textPreviewContent').innerText = data.content;
+                copyBtn.style.display = 'inline-block';
+            } else {
+                body.innerHTML = `<p style="color:#94a3b8; text-align:center;">Bu turdagi faylni brauzerda to'g'ridan-to'g'ri ochib bo'lmaydi.<br>Pastdagi tugma orqali yuklab olishingiz mumkin.</p>`;
+            }
+        }
+
+        function closePreview() {
+            // Video yoki audio orqada o'ynab qolmasligi uchun tozalaymiz
+            document.getElementById('previewBody').innerHTML = '';
+            closeModal('previewModal');
+        }
+
+        function copyContent() {
+            const el = document.getElementById('textPreviewContent');
+            if (el) {
+                navigator.clipboard.writeText(el.innerText);
+                alert("Nusxa olindi!");
+            }
+        }
+
+        async function uploadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch('/api/upload', { method: 'POST', headers: { 'X-Token': token }, body: formData });
+            event.target.value = '';
+            fetchFiles();
+        }
+
+        async function saveNote() {
+            const title = document.getElementById('noteTitle').value;
+            const content = document.getElementById('noteContent').value;
+            if (!content.trim()) return alert("Matn kiriting!");
+            await fetch('/api/note', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Token': token },
+                body: JSON.stringify({ title, content })
+            });
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+            closeModal('noteModal');
+            fetchFiles();
+        }
+
+        async function deleteFile(filename) {
+            if (!confirm(filename + " o'chirilsinmi?")) return;
+            await fetch('/api/delete/' + encodeURIComponent(filename), { method: 'DELETE', headers: { 'X-Token': token } });
+            fetchFiles();
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    </script>
+</body>
+</html>
