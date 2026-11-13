@@ -228,4 +228,179 @@
 
         function filterFiles(category, btn) {
             currentCategory = category;
-            document.querySelector
+            document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderFiles();
+        }
+
+        function renderFiles() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const grid = document.getElementById('filesGrid');
+            grid.innerHTML = '';
+
+            const filtered = allFiles.filter(f => {
+                if (!f.name.toLowerCase().includes(query)) return false;
+                if (currentCategory === 'video') return videoExts.includes(f.ext);
+                if (currentCategory === 'image') return imageExts.includes(f.ext);
+                if (currentCategory === 'text') return textExts.includes(f.ext);
+                if (currentCategory === 'doc') return docExts.includes(f.ext);
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="color:#94a3b8;">Fayllar topilmadi.</p>';
+                return;
+            }
+
+            filtered.forEach(file => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-clickable" onclick="previewFile('${file.name}', '${file.ext}')">
+                        <div class="file-icon">${getIcon(file.ext)}</div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-meta">${file.size} KB • ${file.date}</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="link-btn" onclick="previewFile('${file.name}', '${file.ext}')">👁️ Ko'rish</button>
+                        <a href="/api/download/${encodeURIComponent(file.name)}?token=${encodeURIComponent(token)}" class="link-btn">⬇️ Yuklash</a>
+                        <button class="del-btn" onclick="deleteFile('${file.name}')">🗑️</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        async function previewFile(filename, ext) {
+            const body = document.getElementById('previewBody');
+            const copyBtn = document.getElementById('copyTextBtn');
+            const dlBtn = document.getElementById('modalDownloadBtn');
+            
+            document.getElementById('previewTitle').innerText = filename;
+            dlBtn.href = `/api/download/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
+            copyBtn.style.display = 'none';
+            body.innerHTML = '<p style="color:#94a3b8;">Yuklanmoqda...</p>';
+            openModal('previewModal');
+
+            const viewUrl = `/api/view/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
+
+            if (videoExts.includes(ext)) {
+                body.innerHTML = `<video src="${viewUrl}" controls autoplay></video>`;
+            } else if (imageExts.includes(ext)) {
+                body.innerHTML = `<img src="${viewUrl}" alt="${filename}">`;
+            } else if (audioExts.includes(ext)) {
+                body.innerHTML = `<audio src="${viewUrl}" controls autoplay style="width:100%;"></audio>`;
+            } else if (ext === '.pdf') {
+                body.innerHTML = `<iframe src="${viewUrl}"></iframe>`;
+            } else if (textExts.includes(ext)) {
+                const res = await fetch('/api/read/' + encodeURIComponent(filename), { headers: { 'X-Token': token } });
+                const data = await res.json();
+                body.innerHTML = `<pre id="textPreviewContent"></pre>`;
+                document.getElementById('textPreviewContent').innerText = data.content;
+                copyBtn.style.display = 'inline-block';
+            } else {
+                body.innerHTML = `<p style="color:#94a3b8; text-align:center;">Bu turdagi faylni brauzerda to'g'ridan-to'g'ri ochib bo'lmaydi.<br>Pastdagi tugma orqali yuklab olishingiz mumkin.</p>`;
+            }
+        }
+
+        function closePreview() {
+            document.getElementById('previewBody').innerHTML = '';
+            closeModal('previewModal');
+        }
+
+        function copyContent() {
+            const el = document.getElementById('textPreviewContent');
+            if (el) {
+                navigator.clipboard.writeText(el.innerText);
+                alert("Nusxa olindi!");
+            }
+        }
+
+        function uploadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const box = document.getElementById('uploadProgressBox');
+            const nameEl = document.getElementById('uploadFileName');
+            const percentEl = document.getElementById('uploadPercent');
+            const fillEl = document.getElementById('uploadFill');
+            const statusEl = document.getElementById('uploadStatusText');
+
+            box.style.display = 'flex';
+            nameEl.innerText = `⬆️ ${file.name}`;
+            percentEl.innerText = '0%';
+            fillEl.style.width = '0%';
+            statusEl.innerText = 'Serverga yuborilmoqda...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload', true);
+            xhr.setRequestHeader('X-Token', token);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    const loadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
+                    const totalMB = (e.total / (1024 * 1024)).toFixed(2);
+
+                    percentEl.innerText = percent + '%';
+                    fillEl.style.width = percent + '%';
+
+                    if (percent < 100) {
+                        statusEl.innerText = `Yuklandi: ${loadedMB} MB / ${totalMB} MB`;
+                    } else {
+                        statusEl.innerText = 'Bulutga saqlanmoqda, biroz kuting...';
+                    }
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    percentEl.innerText = '100% ✅';
+                    statusEl.innerText = 'Muvaffaqiyatli yuklandi!';
+                    fetchFiles();
+                    setTimeout(() => {
+                        box.style.display = 'none';
+                    }, 2000);
+                } else {
+                    statusEl.innerText = '❌ Xatolik yuz berdi! (Fayl hajmi 50 MB dan oshmaganini tekshiring)';
+                }
+                event.target.value = '';
+            };
+
+            xhr.onerror = function() {
+                statusEl.innerText = '❌ Internet uzildi yoki serverga ulanib bo\'lmadi.';
+                event.target.value = '';
+            };
+
+            xhr.send(formData);
+        }
+
+        async function saveNote() {
+            const title = document.getElementById('noteTitle').value;
+            const content = document.getElementById('noteContent').value;
+            if (!content.trim()) return alert("Matn kiriting!");
+            await fetch('/api/note', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Token': token },
+                body: JSON.stringify({ title, content })
+            });
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+            closeModal('noteModal');
+            fetchFiles();
+        }
+
+        async function deleteFile(filename) {
+            if (!confirm(filename + " o'chirilsinmi?")) return;
+            await fetch('/api/delete/' + encodeURIComponent(filename), { method: 'DELETE', headers: { 'X-Token': token } });
+            fetchFiles();
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    </script>
+</body>
+</html>
